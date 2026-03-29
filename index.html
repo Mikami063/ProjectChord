@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chord Blocks</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Local chord sketchpad</p>
+          <h1>Build voicings block by block.</h1>
+          <p class="hero-copy">
+            Type a chord, choose the starting degree, and audition each block on a keyboard.
+          </p>
+        </div>
+        <div class="transport">
+          <label class="transport-field">
+            <span>BPM</span>
+            <input id="bpm-input" type="number" min="40" max="220" value="96" />
+          </label>
+          <button id="play-sequence-button" class="primary-button">Play Sequence</button>
+          <button id="stop-sequence-button" class="ghost-button">Stop</button>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="panel timeline-panel">
+          <div class="panel-header">
+            <div>
+              <p class="panel-title">Blocks</p>
+              <p class="panel-subtitle">Each block can hold one chord or stay empty.</p>
+            </div>
+            <div class="panel-actions">
+              <button id="add-block-button" class="ghost-button">Add Block</button>
+              <button id="duplicate-block-button" class="ghost-button">Duplicate</button>
+              <button id="clear-block-button" class="ghost-button">Clear</button>
+            </div>
+          </div>
+          <div id="timeline" class="timeline"></div>
+        </section>
+
+        <section class="editor-grid">
+          <section class="panel editor-panel">
+            <div class="panel-header">
+              <div>
+                <p class="panel-title">Block Editor</p>
+                <p id="selected-block-label" class="panel-subtitle">Block 1</p>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <label class="field">
+                <span>Chord</span>
+                <input id="chord-input" type="text" placeholder="Ebm, Cmaj7, F#sus4" />
+              </label>
+
+              <label class="field">
+                <span>Register</span>
+                <select id="octave-input">
+                  <option value="2">2</option>
+                  <option value="3" selected>3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                </select>
+              </label>
+
+              <label class="field">
+                <span>Start On</span>
+                <select id="inversion-input"></select>
+              </label>
+
+              <label class="field checkbox-field">
+                <input id="rest-input" type="checkbox" />
+                <span>Empty block</span>
+              </label>
+            </div>
+
+            <div class="editor-actions">
+              <button id="preview-button" class="primary-button">Play Block</button>
+              <button id="apply-button" class="ghost-button">Apply Changes</button>
+            </div>
+
+            <div class="analysis-card">
+              <p class="analysis-label">Resolved Notes</p>
+              <p id="resolved-notes" class="analysis-value">Eb3 Gb3 Bb3</p>
+              <p id="analysis-detail" class="analysis-detail">Minor triad in root position.</p>
+            </div>
+          </section>
+
+          <section class="panel keyboard-panel">
+            <div class="panel-header">
+              <div>
+                <p class="panel-title">Keyboard Preview</p>
+                <p class="panel-subtitle">Highlighted keys show the selected block voicing.</p>
+              </div>
+            </div>
+            <div id="keyboard" class="keyboard"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <template id="block-template">
+      <button class="block-card">
+        <span class="block-index"></span>
+        <span class="block-chord"></span>
+        <span class="block-meta"></span>
+        <span class="block-notes"></span>
+      </button>
+    </template>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
