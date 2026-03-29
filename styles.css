@@ -97,6 +97,26 @@ h1 {
   gap: 8px;
 }
 
+.transport-slider-field {
+  min-width: 220px;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.slider-row input[type="range"] {
+  flex: 1;
+}
+
+.slider-value {
+  min-width: 48px;
+  color: var(--accent-strong);
+  font-variant-numeric: tabular-nums;
+}
+
 .workspace {
   margin-top: 24px;
   display: grid;
@@ -188,11 +208,16 @@ h1 {
 
 input[type="text"],
 input[type="number"],
+input[type="range"],
 select {
   border: 1px solid rgba(85, 60, 29, 0.18);
   border-radius: 14px;
   padding: 12px 14px;
   background: rgba(255,255,255,0.72);
+}
+
+input[type="range"] {
+  padding: 0;
 }
 
 .checkbox-field {

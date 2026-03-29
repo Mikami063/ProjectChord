@@ -21,6 +21,13 @@
             <span>BPM</span>
             <input id="bpm-input" type="number" min="40" max="220" value="96" />
           </label>
+          <label class="transport-field transport-slider-field">
+            <span>Volume</span>
+            <div class="slider-row">
+              <input id="volume-input" type="range" min="25" max="900" value="300" />
+              <span id="volume-value" class="slider-value">300%</span>
+            </div>
+          </label>
           <button id="save-button" class="ghost-button">Save</button>
           <button id="reset-button" class="ghost-button">Reset</button>
           <button id="export-button" class="ghost-button">Export</button>

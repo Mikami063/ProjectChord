@@ -54,6 +54,7 @@ const STORAGE_KEY = "chord-blocks-project-v1";
 
 const defaultProject = {
   bpm: 96,
+  volume: 3,
   selectedBlockId: "block-1",
   playTimerId: null,
   blocks: [
@@ -102,6 +103,8 @@ const elements = {
   analysisDetail: document.querySelector("#analysis-detail"),
   keyboard: document.querySelector("#keyboard"),
   bpmInput: document.querySelector("#bpm-input"),
+  volumeInput: document.querySelector("#volume-input"),
+  volumeValue: document.querySelector("#volume-value"),
   saveStatus: document.querySelector("#save-status"),
 };
 
@@ -120,6 +123,12 @@ elements.bpmInput.addEventListener("change", () => {
   state.bpm = clamp(Number(elements.bpmInput.value) || 96, 40, 220);
   elements.bpmInput.value = String(state.bpm);
   persistProject("Tempo saved locally.");
+});
+elements.volumeInput.addEventListener("input", () => {
+  state.volume = clamp(Number(elements.volumeInput.value) / 100, 0.25, 9);
+  updateVolumeUI();
+  updateMasterGain();
+  persistProject("Volume saved locally.");
 });
 elements.chordInput.addEventListener("input", refreshEditorPreview);
 elements.octaveInput.addEventListener("change", refreshEditorPreview);
@@ -266,6 +275,7 @@ function createId() {
 function cloneDefaultProject() {
   return {
     bpm: defaultProject.bpm,
+    volume: defaultProject.volume,
     selectedBlockId: defaultProject.selectedBlockId,
     playTimerId: null,
     blocks: defaultProject.blocks.map((block) =>
@@ -302,6 +312,7 @@ function loadProject() {
 
     return {
       bpm: clamp(Number(parsed.bpm) || 96, 40, 220),
+      volume: clamp(Number(parsed.volume) || defaultProject.volume, 0.25, 9),
       selectedBlockId: typeof parsed.selectedBlockId === "string" ? parsed.selectedBlockId : blocks[0].id,
       playTimerId: null,
       blocks,
@@ -314,6 +325,7 @@ function loadProject() {
 function serializeProject() {
   return {
     bpm: state.bpm,
+    volume: state.volume,
     selectedBlockId: state.selectedBlockId,
     blocks: state.blocks.map((block) => ({
       id: block.id,
@@ -336,9 +348,16 @@ function persistProject(message = "Saved locally.") {
 
 function render() {
   elements.bpmInput.value = String(state.bpm);
+  updateVolumeUI();
   renderTimeline();
   renderEditor();
   renderKeyboard();
+}
+
+function updateVolumeUI() {
+  const percent = Math.round((state.volume ?? defaultProject.volume) * 100);
+  elements.volumeInput.value = String(percent);
+  elements.volumeValue.textContent = `${percent}%`;
 }
 
 function renderTimeline() {
@@ -531,9 +550,11 @@ function handleResetProject() {
   stopSequence();
   const replacement = cloneDefaultProject();
   state.bpm = replacement.bpm;
+  state.volume = replacement.volume;
   state.selectedBlockId = replacement.selectedBlockId;
   state.blocks = replacement.blocks;
   render();
+  updateMasterGain();
   persistProject("Project reset to defaults.");
 }
 
@@ -563,6 +584,7 @@ function handleImportProject() {
       const parsed = JSON.parse(text);
       const loaded = {
         bpm: clamp(Number(parsed.bpm) || 96, 40, 220),
+        volume: clamp(Number(parsed.volume) || defaultProject.volume, 0.25, 9),
         selectedBlockId: typeof parsed.selectedBlockId === "string" ? parsed.selectedBlockId : "block-1",
         playTimerId: null,
         blocks: Array.isArray(parsed.blocks)
@@ -584,12 +606,14 @@ function handleImportProject() {
 
       stopSequence();
       state.bpm = loaded.bpm;
+      state.volume = loaded.volume;
       state.selectedBlockId = loaded.selectedBlockId;
       state.blocks = loaded.blocks;
       if (!state.blocks.some((block) => block.id === state.selectedBlockId)) {
         state.selectedBlockId = state.blocks[0].id;
       }
       render();
+      updateMasterGain();
       persistProject("Project imported and saved locally.");
     } catch (error) {
       elements.saveStatus.textContent = "Import failed. Use a valid project JSON file.";
@@ -599,15 +623,39 @@ function handleImportProject() {
 }
 
 let audioContext;
+let masterGainNode;
+
+function ensureAudioGraph() {
+  if (!audioContext) {
+    audioContext = new AudioContext();
+  }
+
+  if (!masterGainNode) {
+    masterGainNode = audioContext.createGain();
+    masterGainNode.connect(audioContext.destination);
+  }
+
+  updateMasterGain();
+}
+
+function updateMasterGain() {
+  if (!masterGainNode || !audioContext) {
+    return;
+  }
+
+  const now = audioContext.currentTime;
+  const safeVolume = clamp(state.volume ?? defaultProject.volume, 0.25, 9);
+  masterGainNode.gain.cancelScheduledValues(now);
+  masterGainNode.gain.setValueAtTime(masterGainNode.gain.value || safeVolume, now);
+  masterGainNode.gain.linearRampToValueAtTime(safeVolume, now + 0.04);
+}
 
 async function playBlock(block) {
   if (!block || block.isRest || !block.resolution.ok || block.resolution.midiNotes.length === 0) {
     return;
   }
 
-  if (!audioContext) {
-    audioContext = new AudioContext();
-  }
+  ensureAudioGraph();
 
   if (audioContext.state === "suspended") {
     await audioContext.resume();
@@ -615,8 +663,8 @@ async function playBlock(block) {
 
   const now = audioContext.currentTime;
   const output = audioContext.createGain();
-  output.gain.value = 0.12;
-  output.connect(audioContext.destination);
+  output.gain.value = 0.55;
+  output.connect(masterGainNode);
 
   block.resolution.midiNotes.forEach((midi, noteIndex) => {
     const oscillator = audioContext.createOscillator();
