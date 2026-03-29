@@ -6,14 +6,21 @@ Simple local prototype for building chord blocks, choosing inversions, previewin
 
 Open `index.html` in a browser.
 
+If your browser behaves oddly when opened via `file://`, run a tiny local server instead:
+
+- `python3 -m http.server 4173`
+- then open `http://localhost:4173`
+
 ## Current scope
 
 - Enter chord symbols such as `Ebm`, `Cmaj7`, `Bb7`, `F#sus4`
 - Choose register and inversion start note
 - Keep a block empty
 - See resolved notes and keyboard highlights
-- Click `Play Block` or double-click a block to audition it
+- Click a block or `Play Block` to audition it
 - Play the full block sequence using BPM timing
+- Save automatically in browser local storage
+- Manual save, reset, export, and import
 
 ## Supported chord types
 

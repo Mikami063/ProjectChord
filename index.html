@@ -21,6 +21,10 @@
             <span>BPM</span>
             <input id="bpm-input" type="number" min="40" max="220" value="96" />
           </label>
+          <button id="save-button" class="ghost-button">Save</button>
+          <button id="reset-button" class="ghost-button">Reset</button>
+          <button id="export-button" class="ghost-button">Export</button>
+          <button id="import-button" class="ghost-button">Import</button>
           <button id="play-sequence-button" class="primary-button">Play Sequence</button>
           <button id="stop-sequence-button" class="ghost-button">Stop</button>
         </div>
@@ -84,6 +88,7 @@
             </div>
 
             <div class="analysis-card">
+              <p id="save-status" class="save-status">Working locally. Changes autosave in this browser.</p>
               <p class="analysis-label">Resolved Notes</p>
               <p id="resolved-notes" class="analysis-value">Eb3 Gb3 Bb3</p>
               <p id="analysis-detail" class="analysis-detail">Minor triad in root position.</p>
@@ -112,6 +117,6 @@
       </button>
     </template>
 
-    <script type="module" src="./app.js"></script>
+    <script src="./app.js" defer></script>
   </body>
 </html>

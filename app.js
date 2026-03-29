@@ -50,8 +50,9 @@ const SHARP_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#",
 const FLAT_NAMES = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
 const KEYBOARD_START = 36;
 const KEYBOARD_END = 83;
+const STORAGE_KEY = "chord-blocks-project-v1";
 
-const state = {
+const defaultProject = {
   bpm: 96,
   selectedBlockId: "block-1",
   playTimerId: null,
@@ -87,6 +88,8 @@ const state = {
   ],
 };
 
+const state = loadProject();
+
 const elements = {
   timeline: document.querySelector("#timeline"),
   blockTemplate: document.querySelector("#block-template"),
@@ -99,11 +102,16 @@ const elements = {
   analysisDetail: document.querySelector("#analysis-detail"),
   keyboard: document.querySelector("#keyboard"),
   bpmInput: document.querySelector("#bpm-input"),
+  saveStatus: document.querySelector("#save-status"),
 };
 
 document.querySelector("#add-block-button").addEventListener("click", handleAddBlock);
 document.querySelector("#duplicate-block-button").addEventListener("click", handleDuplicateBlock);
 document.querySelector("#clear-block-button").addEventListener("click", handleClearBlock);
+document.querySelector("#save-button").addEventListener("click", handleSaveProject);
+document.querySelector("#reset-button").addEventListener("click", handleResetProject);
+document.querySelector("#export-button").addEventListener("click", handleExportProject);
+document.querySelector("#import-button").addEventListener("click", handleImportProject);
 document.querySelector("#preview-button").addEventListener("click", playEditorPreview);
 document.querySelector("#apply-button").addEventListener("click", applyEditorToSelectedBlock);
 document.querySelector("#play-sequence-button").addEventListener("click", playSequence);
@@ -111,6 +119,7 @@ document.querySelector("#stop-sequence-button").addEventListener("click", stopSe
 elements.bpmInput.addEventListener("change", () => {
   state.bpm = clamp(Number(elements.bpmInput.value) || 96, 40, 220);
   elements.bpmInput.value = String(state.bpm);
+  persistProject("Tempo saved locally.");
 });
 elements.chordInput.addEventListener("input", refreshEditorPreview);
 elements.octaveInput.addEventListener("change", refreshEditorPreview);
@@ -120,7 +129,7 @@ elements.restInput.addEventListener("change", refreshEditorPreview);
 render();
 
 function createBlock(overrides = {}) {
-  const id = overrides.id ?? `block-${crypto.randomUUID()}`;
+  const id = overrides.id ?? `block-${createId()}`;
   const chordSymbol = overrides.chordSymbol ?? "";
   const rootOctave = overrides.rootOctave ?? 3;
   const inversionIndex = overrides.inversionIndex ?? 0;
@@ -247,7 +256,86 @@ function getSelectedBlock() {
   return state.blocks.find((block) => block.id === state.selectedBlockId) ?? state.blocks[0];
 }
 
+function createId() {
+  if (globalThis.crypto?.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+}
+
+function cloneDefaultProject() {
+  return {
+    bpm: defaultProject.bpm,
+    selectedBlockId: defaultProject.selectedBlockId,
+    playTimerId: null,
+    blocks: defaultProject.blocks.map((block) =>
+      createBlock({
+        id: block.id,
+        chordSymbol: block.chordSymbol,
+        rootOctave: block.rootOctave,
+        inversionIndex: block.inversionIndex,
+        isRest: block.isRest,
+      }),
+    ),
+  };
+}
+
+function loadProject() {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      return cloneDefaultProject();
+    }
+
+    const parsed = JSON.parse(raw);
+    const blocks = Array.isArray(parsed.blocks) && parsed.blocks.length > 0
+      ? parsed.blocks.map((block) =>
+          createBlock({
+            id: typeof block.id === "string" ? block.id : undefined,
+            chordSymbol: typeof block.chordSymbol === "string" ? block.chordSymbol : "",
+            rootOctave: clamp(Number(block.rootOctave) || 3, 2, 5),
+            inversionIndex: Math.max(0, Number(block.inversionIndex) || 0),
+            isRest: Boolean(block.isRest),
+          }),
+        )
+      : cloneDefaultProject().blocks;
+
+    return {
+      bpm: clamp(Number(parsed.bpm) || 96, 40, 220),
+      selectedBlockId: typeof parsed.selectedBlockId === "string" ? parsed.selectedBlockId : blocks[0].id,
+      playTimerId: null,
+      blocks,
+    };
+  } catch (error) {
+    return cloneDefaultProject();
+  }
+}
+
+function serializeProject() {
+  return {
+    bpm: state.bpm,
+    selectedBlockId: state.selectedBlockId,
+    blocks: state.blocks.map((block) => ({
+      id: block.id,
+      chordSymbol: block.chordSymbol,
+      rootOctave: block.rootOctave,
+      inversionIndex: block.inversionIndex,
+      isRest: block.isRest,
+    })),
+  };
+}
+
+function persistProject(message = "Saved locally.") {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeProject()));
+    elements.saveStatus.textContent = message;
+  } catch (error) {
+    elements.saveStatus.textContent = "Local save failed in this browser.";
+  }
+}
+
 function render() {
+  elements.bpmInput.value = String(state.bpm);
   renderTimeline();
   renderEditor();
   renderKeyboard();
@@ -390,6 +478,7 @@ function applyEditorToSelectedBlock() {
   });
 
   render();
+  persistProject("Block saved locally.");
 }
 
 function playEditorPreview() {
@@ -410,6 +499,7 @@ function handleAddBlock() {
   state.blocks.push(newBlock);
   state.selectedBlockId = newBlock.id;
   render();
+  persistProject("New block added.");
 }
 
 function handleDuplicateBlock() {
@@ -423,12 +513,89 @@ function handleDuplicateBlock() {
   state.blocks.splice(state.blocks.indexOf(block) + 1, 0, duplicate);
   state.selectedBlockId = duplicate.id;
   render();
+  persistProject("Block duplicated.");
 }
 
 function handleClearBlock() {
   const block = getSelectedBlock();
   Object.assign(block, createBlock({ id: block.id, chordSymbol: "", rootOctave: 3, inversionIndex: 0, isRest: true }));
   render();
+  persistProject("Block cleared.");
+}
+
+function handleSaveProject() {
+  persistProject("Project saved locally.");
+}
+
+function handleResetProject() {
+  stopSequence();
+  const replacement = cloneDefaultProject();
+  state.bpm = replacement.bpm;
+  state.selectedBlockId = replacement.selectedBlockId;
+  state.blocks = replacement.blocks;
+  render();
+  persistProject("Project reset to defaults.");
+}
+
+function handleExportProject() {
+  const blob = new Blob([JSON.stringify(serializeProject(), null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "chord-blocks-project.json";
+  link.click();
+  URL.revokeObjectURL(url);
+  elements.saveStatus.textContent = "Project exported.";
+}
+
+function handleImportProject() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "application/json,.json";
+  input.addEventListener("change", async () => {
+    const file = input.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      const loaded = {
+        bpm: clamp(Number(parsed.bpm) || 96, 40, 220),
+        selectedBlockId: typeof parsed.selectedBlockId === "string" ? parsed.selectedBlockId : "block-1",
+        playTimerId: null,
+        blocks: Array.isArray(parsed.blocks)
+          ? parsed.blocks.map((block) =>
+              createBlock({
+                id: typeof block.id === "string" ? block.id : undefined,
+                chordSymbol: typeof block.chordSymbol === "string" ? block.chordSymbol : "",
+                rootOctave: clamp(Number(block.rootOctave) || 3, 2, 5),
+                inversionIndex: Math.max(0, Number(block.inversionIndex) || 0),
+                isRest: Boolean(block.isRest),
+              }),
+            )
+          : [],
+      };
+
+      if (loaded.blocks.length === 0) {
+        throw new Error("No blocks found.");
+      }
+
+      stopSequence();
+      state.bpm = loaded.bpm;
+      state.selectedBlockId = loaded.selectedBlockId;
+      state.blocks = loaded.blocks;
+      if (!state.blocks.some((block) => block.id === state.selectedBlockId)) {
+        state.selectedBlockId = state.blocks[0].id;
+      }
+      render();
+      persistProject("Project imported and saved locally.");
+    } catch (error) {
+      elements.saveStatus.textContent = "Import failed. Use a valid project JSON file.";
+    }
+  });
+  input.click();
 }
 
 let audioContext;

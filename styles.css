@@ -226,6 +226,12 @@ select {
   background: linear-gradient(180deg, rgba(255,255,255,0.62), rgba(237,227,210,0.9));
 }
 
+.save-status {
+  margin: 0 0 14px;
+  color: var(--accent-strong);
+  font-size: 0.92rem;
+}
+
 .analysis-value {
   margin: 8px 0;
   font-size: 1.4rem;
