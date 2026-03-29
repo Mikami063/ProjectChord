@@ -624,15 +624,26 @@ function handleImportProject() {
 
 let audioContext;
 let masterGainNode;
+let masterCompressorNode;
 
 function ensureAudioGraph() {
   if (!audioContext) {
     audioContext = new AudioContext();
   }
 
+  if (!masterCompressorNode) {
+    masterCompressorNode = audioContext.createDynamicsCompressor();
+    masterCompressorNode.threshold.value = -24;
+    masterCompressorNode.knee.value = 24;
+    masterCompressorNode.ratio.value = 3;
+    masterCompressorNode.attack.value = 0.003;
+    masterCompressorNode.release.value = 0.2;
+    masterCompressorNode.connect(audioContext.destination);
+  }
+
   if (!masterGainNode) {
     masterGainNode = audioContext.createGain();
-    masterGainNode.connect(audioContext.destination);
+    masterGainNode.connect(masterCompressorNode);
   }
 
   updateMasterGain();
@@ -663,26 +674,73 @@ async function playBlock(block) {
 
   const now = audioContext.currentTime;
   const output = audioContext.createGain();
-  output.gain.value = 0.55;
-  output.connect(masterGainNode);
+  const blockFilter = audioContext.createBiquadFilter();
+  blockFilter.type = "lowpass";
+  blockFilter.frequency.setValueAtTime(2200, now);
+  blockFilter.Q.value = 0.8;
+  blockFilter.frequency.exponentialRampToValueAtTime(1350, now + 0.42);
+
+  output.gain.value = 0.42;
+  output.connect(blockFilter);
+  blockFilter.connect(masterGainNode);
 
   block.resolution.midiNotes.forEach((midi, noteIndex) => {
-    const oscillator = audioContext.createOscillator();
-    const gain = audioContext.createGain();
-    oscillator.type = noteIndex === 0 ? "triangle" : "sine";
-    oscillator.frequency.value = midiToFrequency(midi);
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.16 / (noteIndex + 1), now + 0.03);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
-    oscillator.connect(gain);
-    gain.connect(output);
-    oscillator.start(now);
-    oscillator.stop(now + 1.22);
+    playVoice(midi, now, output, noteIndex);
   });
 }
 
 function midiToFrequency(midi) {
   return 440 * 2 ** ((midi - 69) / 12);
+}
+
+function playVoice(midi, startTime, destination, noteIndex) {
+  const frequency = midiToFrequency(midi);
+  const voiceGain = audioContext.createGain();
+  const partialMix = audioContext.createGain();
+  const shimmerMix = audioContext.createGain();
+  const noteFilter = audioContext.createBiquadFilter();
+  const noteDuration = 1.7;
+  const baseLevel = noteIndex === 0 ? 0.34 : 0.24;
+
+  voiceGain.gain.setValueAtTime(0.0001, startTime);
+  voiceGain.gain.exponentialRampToValueAtTime(baseLevel, startTime + 0.02);
+  voiceGain.gain.exponentialRampToValueAtTime(baseLevel * 0.58, startTime + 0.18);
+  voiceGain.gain.exponentialRampToValueAtTime(0.0001, startTime + noteDuration);
+
+  noteFilter.type = "lowpass";
+  noteFilter.frequency.setValueAtTime(Math.min(4200, frequency * 7.5), startTime);
+  noteFilter.frequency.exponentialRampToValueAtTime(Math.min(2200, frequency * 4.2), startTime + 0.22);
+  noteFilter.Q.value = 1.1;
+
+  partialMix.gain.value = 0.7;
+  shimmerMix.gain.value = 0.22;
+
+  partialMix.connect(noteFilter);
+  shimmerMix.connect(noteFilter);
+  noteFilter.connect(voiceGain);
+  voiceGain.connect(destination);
+
+  createOscillatorVoice("triangle", frequency, 0, startTime, noteDuration, partialMix);
+  createOscillatorVoice("sawtooth", frequency, -5, startTime, noteDuration, partialMix);
+  createOscillatorVoice("sine", frequency * 2, 3, startTime, noteDuration * 0.72, shimmerMix);
+}
+
+function createOscillatorVoice(type, frequency, detune, startTime, duration, destination) {
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(frequency, startTime);
+  oscillator.detune.setValueAtTime(detune, startTime);
+
+  gain.gain.setValueAtTime(0.0001, startTime);
+  gain.gain.exponentialRampToValueAtTime(type === "sine" ? 0.12 : 0.2, startTime + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+  oscillator.connect(gain);
+  gain.connect(destination);
+  oscillator.start(startTime);
+  oscillator.stop(startTime + duration + 0.02);
 }
 
 function playSequence() {
